@@ -1,4 +1,4 @@
-const CACHE_NAME = 'showdown-scorekeeper-v6';
+const CACHE_NAME = 'showdown-scorekeeper-v7';
 const APP_FILES = [
   './index.html',
   './manifest.webmanifest',
