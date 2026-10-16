@@ -172,25 +172,23 @@ function seedDrillsV2(){db.seededDrillLibraryV2=true;} function cleanupRemovedDe
 ]);const norm=s=>String(s||'').trim().toLowerCase().replace(/[–—]/g,'-').replace(/\s+/g,' ');const removedNorm=new Set([...removedNames].map(norm));const before=db.stages.length;db.stages=db.stages.filter(s=>!removedNorm.has(norm(s.name)));return before-db.stages.length;}
 function cleanupLibraryV13(){
  // Remove only the specifically rejected Assessment entry; keep the separate Scrambler drill.
- db.stages=db.stages.filter(s=>String(s.name||'').trim().toLowerCase()!=='scrambler assessment' && String(s.name||'').trim().toLowerCase()!=='t.rex arms — scrambler assessment');
- // Bill Drill Rundown has a duplicate Points Only version. Prefer the user's non-Points-Only
- // version; among those, preserve the version that differs from the original seed the most.
- const normName=s=>String(s.name||'').trim().toLowerCase().replace(/[–—]/g,'-').replace(/\s+/g,' ');
- const matches=db.stages.filter(s=>normName(s)==='xray alpha - bill drill rundown' || normName(s)==='xray alpha — bill drill rundown');
+ db.stages=db.stages.filter(s=>{const n=String(s.name||'').trim().toLowerCase().replace(/[–—]/g,'-').replace(/\s+/g,' ');return n!=='scrambler assessment'&&n!=='t.rex arms - scrambler assessment';});
+ // Deduplicate Bill Drill Rundown across punctuation/spacing variants. Keep the user's
+ // modified non-Points-Only copy where possible, and preserve historical event snapshots.
+ const canonName=s=>String(s.name||'').toLowerCase().replace(/\u2013|\u2014/g,'-').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
+ const matches=db.stages.filter(s=>{const n=canonName(s);return n.includes('bill drill rundown')&&(n.includes('xray alpha')||n.includes('x ray alpha'));});
  if(matches.length>1){
   const defaultRules='Starting at 20 yd, shoot one Bill Drill. Move to the 10 yd mark and shoot one Bill Drill. Reload while moving to 5 yd, then shoot the final Bill Drill. Verify start condition, reload requirement, hit standard, and intended firearm against the creator’s instructions before use.';
   const defaultNotes='18 rounds total as listed (three 6-round Bill Drills). Setup: one USPSA-style target with marked positions at 5, 10, and 20 yd. Confirm source details before use.';
-  const candidates=matches.filter(s=>s.method!=='pointsonly');
-  const pool=candidates.length?candidates:matches;
-  const score=s=>(s.rules&&s.rules!==defaultRules?4:0)+(s.notes&&s.notes!==defaultNotes?4:0)+(s.method!=='hitfactor'?2:0)+(s.firearm!=='both'?1:0)+(s.sourceUrl&&s.sourceUrl!=='https://www.xrayalpha.com/'?1:0)+(s.needsReview===false?0.5:0)+(s.updatedAt?Date.parse(s.updatedAt)||0:0)/1e15;
+  const nonPoints=matches.filter(s=>s.method!=='pointsonly');
+  const pool=nonPoints.length?nonPoints:matches;
+  const score=s=>(s.rules&&s.rules!==defaultRules?100:0)+(s.notes&&s.notes!==defaultNotes?100:0)+(s.method!=='hitfactor'?20:0)+(s.firearm!=='both'?10:0)+(s.sourceUrl&&s.sourceUrl!=='https://www.xrayalpha.com/'?10:0)+(s.needsReview===false?1:0)+(s.updatedAt?Date.parse(s.updatedAt)||0:0)/1e15;
   pool.sort((a,b)=>score(b)-score(a));
   const keeper=pool[0];
-  const remove=new Set(matches.filter(s=>s.id!==keeper.id && (s.method==='pointsonly' || pool.length>1)).map(s=>s.id));
+  const remove=new Set(matches.filter(s=>s.id!==keeper.id).map(s=>s.id));
   db.stages=db.stages.filter(s=>!remove.has(s.id));
-  // Retarget event links to the surviving template ID without changing historical event snapshots.
   db.events.forEach(e=>(e.stages||[]).forEach(es=>{if(remove.has(es.templateId))es.templateId=keeper.id;}));
  }
- // Ensure Nocturnality stages are first while preserving other stage order.
  db.stages=orderedStages(db.stages);
 }
 function cleanupLibraryV12(){cleanupLibraryV13()}
